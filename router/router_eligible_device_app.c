@@ -93,6 +93,12 @@ Private macros
 
 #define APP_DEFAULT_DEST_ADDR                   in6addr_realmlocal_allthreadnodes
 
+
+/* Enums for accelerometer data organization */
+enum{ xData, yData, zData};
+
+#define ACCEL_BUFFER_SIZE						(24U)
+
 /*==================================================================================================
 Private type definitions
 ==================================================================================================*/
@@ -191,6 +197,8 @@ extern bool_t gEnable802154TxLed;
 
 fxos_handle_t gfxosHandle;
 fxos_data_t gsensorData;
+
+
 
 /*==================================================================================================
 Public functions
@@ -1622,48 +1630,99 @@ static void APP_CoapTimerCb (coapSessionStatus_t sessionStatus,void *pData,coapS
 
 }
 
+void *App_GetAccelDataString
+(
+    void
+)
+{
+	uint8_t dataElements = 3;
+	uint16_t AccRaw[dataElements];
 
+	/* Compute temperature */
+	uint8_t *pIndex = NULL;
+	uint8_t sAccel[] = "X=";
+	uint8_t *sendAccelData = MEM_BufferAlloc(ACCEL_BUFFER_SIZE);
+
+	 /* Get counter value */
+	FXOS_ReadSensorData(&gfxosHandle, &gsensorData);
+
+	/* Get the X, Y and Z data from the sensor data structure in 14 bit left format data*/
+	AccRaw[xData] = (int16_t)((uint16_t)((uint16_t)gsensorData.accelXMSB << 8) | (uint16_t)gsensorData.accelXLSB) / 4U;
+	AccRaw[yData] = (int16_t)((uint16_t)((uint16_t)gsensorData.accelYMSB << 8) | (uint16_t)gsensorData.accelYLSB) / 4U;
+	AccRaw[zData] = (int16_t)((uint16_t)((uint16_t)gsensorData.accelZMSB << 8) | (uint16_t)gsensorData.accelZLSB) / 4U;
+	if(NULL == sendAccelData)
+	{
+	  return sendAccelData;
+	}
+
+	/* Clear data and reset buffers */
+	FLib_MemSet(sendAccelData, 0, ACCEL_BUFFER_SIZE);
+
+	/* Compute output */
+	pIndex = sendAccelData;
+	FLib_MemCpy(pIndex, sAccel, SizeOfString(sAccel));
+	pIndex += SizeOfString(sAccel);
+	NWKU_PrintDec((AccRaw[xData]), pIndex, 5, TRUE);
+	pIndex += 5; /* keep ALL digits */
+	*pIndex = ' ';
+	pIndex++;
+
+	*pIndex = 'Y';
+	pIndex++;
+	*pIndex = '=';
+	pIndex++;
+	NWKU_PrintDec((AccRaw[yData]), pIndex, 5, TRUE);
+	pIndex += 5; /* keep ALL digits */
+	*pIndex = ' ';
+	pIndex++;
+
+	*pIndex = 'Z';
+	pIndex++;
+	*pIndex = '=';
+	pIndex++;
+	NWKU_PrintDec((AccRaw[zData]), pIndex, 5, TRUE);
+	pIndex += 5; /* keep ALL digits */
+	*pIndex = ' ';
+	return sendAccelData;
+}
 
 static void APP_CoapAccelCb(coapSessionStatus_t sessionStatus,void *pData,coapSession_t *pSession,uint32_t dataLen)
 
 {
-	enum{ xData,SPACE1, yData,SPACE2, zData};
-		uint8_t pLoadSize = 5;
-		uint16_t AccRaw[pLoadSize];
+
+
+		uint8_t *pAckMsg;
+		uint32_t loadSize;
 		//char addrStr[INET_ADDRSTRLEN];
 		//ntop(AF_INET, (ipAddr_t*)&pSession->remoteAddrStorage.ss_addr, addrStr, INET_ADDRSTRLEN);
 
 	  if(gCoapGET_c == pSession->code)
 	  {
-		  /* Get counter value */
-		  if (FXOS_ReadSensorData(&gfxosHandle, &gsensorData) != kStatus_Success)
-		 	{
-		 		return -1;
-		 	}
 
-		 	/* Get the X, Y and Z data from the sensor data structure in 14 bit left format data*/
-		  AccRaw[xData] = (int16_t)((uint16_t)((uint16_t)gsensorData.accelXMSB << 8) | (uint16_t)gsensorData.accelXLSB) / 4U;
-		  AccRaw[SPACE1] = 0x30;
-		  AccRaw[yData] = (int16_t)((uint16_t)((uint16_t)gsensorData.accelYMSB << 8) | (uint16_t)gsensorData.accelYLSB) / 4U;
-		  AccRaw[SPACE2] = 0x30;
-		  AccRaw[zData] = (int16_t)((uint16_t)((uint16_t)gsensorData.accelZMSB << 8) | (uint16_t)gsensorData.accelZLSB) / 4U;
+		  pAckMsg = App_GetAccelDataString();
+		  loadSize = strlen((char*)pAckMsg);
+
 	  }
 
 
 		  if(gCoapGET_c == pSession->code)
 		  {
 
-			  COAP_Send(pSession, gCoapMsgTypeAckSuccessContent_c, AccRaw, pLoadSize);
+			  COAP_Send(pSession, gCoapMsgTypeAckSuccessContent_c, pAckMsg, loadSize);
 		  }
 		  else
 		  {
 			  COAP_Send(pSession, gCoapMsgTypeEmptyAck_c, NULL, 0);
 		  }
 
-		  shell_writeN(pData, dataLen);
 		  shell_write("\r\n");
 		  shell_write("SE ENVIARON ESTOS DATOS\r\n");
-		  shell_writeN( AccRaw, pLoadSize+2);
+		  shell_write((char *)pAckMsg);
 		  shell_write("\r\n");
+
+		  if(pAckMsg)
+		 {
+			 MEM_BufferFree(pAckMsg);
+		 }
 }
 
