@@ -258,6 +258,11 @@ void APP_Init
 			};
 		}
 	}
+	 /* Init accelerometer sensor */
+	    if (FXOS_Init(&gfxosHandle) != kStatus_Success)
+	    {
+	        return -1;
+	    }
 	/* END of init accel and i2c */
 
 
@@ -1572,61 +1577,9 @@ Private debug functions
 ==================================================================================================*/
 
 
-static void APP_ProcessTimerCmd(void* pData)
-{
-
-}
-
-
-
 static void APP_CoapTimerCb (coapSessionStatus_t sessionStatus,void *pData,coapSession_t *pSession,uint32_t dataLen)
 {
-
-	enum{ xData, yData, zData};
-	uint8_t pLoadSize = 3;
-	uint16_t AccRaw[pLoadSize];
-	char addrStr[INET_ADDRSTRLEN];
-	ntop(AF_INET, (ipAddr_t*)&pSession->remoteAddrStorage.ss_addr, addrStr, INET_ADDRSTRLEN);
-
-
-
-
-  if(gCoapGET_c == pSession->code)
-  {
-	  /* Get counter value */
-	  if (FXOS_ReadSensorData(&gfxosHandle, &gsensorData) != kStatus_Success)
-	 	{
-	 		return -1;
-	 	}
-
-	 	/* Get the X, Y and Z data from the sensor data structure in 14 bit left format data*/
-	  AccRaw[xData] = (int16_t)((uint16_t)((uint16_t)gsensorData.accelXMSB << 8) | (uint16_t)gsensorData.accelXLSB) / 4U;
-	  AccRaw[yData] = (int16_t)((uint16_t)((uint16_t)gsensorData.accelYMSB << 8) | (uint16_t)gsensorData.accelYLSB) / 4U;
-	  AccRaw[zData] = (int16_t)((uint16_t)((uint16_t)gsensorData.accelZMSB << 8) | (uint16_t)gsensorData.accelZLSB) / 4U;
-  }
-
-
-  if(gCoapConfirmable_c == pSession->msgType)
-  {
-	  if(gCoapGET_c == pSession->code)
-	  {
-
-		  COAP_Send(pSession, gCoapMsgTypeAckSuccessContent_c, AccRaw, pLoadSize);
-	  }
-	  else
-	  {
-		  COAP_Send(pSession, gCoapMsgTypeAckSuccessChanged_c, NULL, 0);
-	  }
-	  shell_write("'CON' packet received from  ");
-	  shell_writeN((char*) addrStr, INET_ADDRSTRLEN);
-	  shell_write("\r\n");
-  }
-  else
-  {
-	  shell_write("'NON' packet received from  ");
-	  shell_writeN((char*) addrStr, INET_ADDRSTRLEN);
-	  shell_write("\r\n");
-  }
+/* Empty for future timer coap  */
 
 }
 
@@ -1647,9 +1600,9 @@ void *App_GetAccelDataString
 	FXOS_ReadSensorData(&gfxosHandle, &gsensorData);
 
 	/* Get the X, Y and Z data from the sensor data structure in 14 bit left format data*/
-	AccRaw[xData] = (int16_t)((uint16_t)((uint16_t)gsensorData.accelXMSB << 8) | (uint16_t)gsensorData.accelXLSB) / 4U;
-	AccRaw[yData] = (int16_t)((uint16_t)((uint16_t)gsensorData.accelYMSB << 8) | (uint16_t)gsensorData.accelYLSB) / 4U;
-	AccRaw[zData] = (int16_t)((uint16_t)((uint16_t)gsensorData.accelZMSB << 8) | (uint16_t)gsensorData.accelZLSB) / 4U;
+	AccRaw[xData] = (int16_t)((uint16_t)((uint16_t)gsensorData.accelXMSB << 8) | (uint16_t)gsensorData.accelXLSB);
+	AccRaw[yData] = (int16_t)((uint16_t)((uint16_t)gsensorData.accelYMSB << 8) | (uint16_t)gsensorData.accelYLSB);
+	AccRaw[zData] = (int16_t)((uint16_t)((uint16_t)gsensorData.accelZMSB << 8) | (uint16_t)gsensorData.accelZLSB);
 	if(NULL == sendAccelData)
 	{
 	  return sendAccelData;
@@ -1689,8 +1642,6 @@ void *App_GetAccelDataString
 static void APP_CoapAccelCb(coapSessionStatus_t sessionStatus,void *pData,coapSession_t *pSession,uint32_t dataLen)
 
 {
-
-
 		uint8_t *pAckMsg;
 		uint32_t loadSize;
 		//char addrStr[INET_ADDRSTRLEN];
@@ -1698,31 +1649,23 @@ static void APP_CoapAccelCb(coapSessionStatus_t sessionStatus,void *pData,coapSe
 
 	  if(gCoapGET_c == pSession->code)
 	  {
-
 		  pAckMsg = App_GetAccelDataString();
 		  loadSize = strlen((char*)pAckMsg);
-
 	  }
 
 
-		  if(gCoapGET_c == pSession->code)
-		  {
+	  if(gCoapGET_c == pSession->code)
+	  {
+		  COAP_Send(pSession, gCoapMsgTypeAckSuccessContent_c, pAckMsg, loadSize);
+	  }
+	  else
+	  {
+		  COAP_Send(pSession, gCoapMsgTypeEmptyAck_c, NULL, 0);
+	  }
 
-			  COAP_Send(pSession, gCoapMsgTypeAckSuccessContent_c, pAckMsg, loadSize);
-		  }
-		  else
-		  {
-			  COAP_Send(pSession, gCoapMsgTypeEmptyAck_c, NULL, 0);
-		  }
-
-		  shell_write("\r\n");
-		  shell_write("SE ENVIARON ESTOS DATOS\r\n");
-		  shell_write((char *)pAckMsg);
-		  shell_write("\r\n");
-
-		  if(pAckMsg)
-		 {
-			 MEM_BufferFree(pAckMsg);
-		 }
+	  if(pAckMsg)
+	 {
+		 MEM_BufferFree(pAckMsg);
+	 }
 }
 
