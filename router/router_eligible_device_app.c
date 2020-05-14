@@ -54,6 +54,11 @@ Include Files
 #include "app_echo_udp.h"
 #endif
 
+/* Accelerometer files */
+#include "fsl_fxos.h"
+#include "stdbool.h"
+
+
 /*==================================================================================================
 Private macros
 ==================================================================================================*/
@@ -184,6 +189,9 @@ taskMsgQueue_t *mpAppThreadMsgQueue = NULL;
 
 extern bool_t gEnable802154TxLed;
 
+fxos_handle_t gfxosHandle;
+fxos_data_t gsensorData;
+
 /*==================================================================================================
 Public functions
 ==================================================================================================*/
@@ -196,6 +204,59 @@ void APP_Init
     void
 )
 {
+	 /* Start Init accelerometer and i2c */
+
+	i2c_master_handle_t MasterHandle;
+	/* FXOS device address */
+	const uint8_t accel_address[] = {0x1CU, 0x1DU, 0x1EU, 0x1FU};
+
+
+	i2c_master_config_t i2cConfig;
+	uint32_t i2cSourceClock;
+	uint8_t acclIndex = 0;
+	uint8_t regResult = 0;
+	uint8_t array_addr_size = 0;
+	bool foundDevice = false;
+
+	/* Board pin, clock, debug console init */
+	BOARD_InitPins();
+	BOARD_BootClockRUN();
+	BOARD_I2C_ReleaseBus();
+	BOARD_I2C_ConfigurePins();
+
+
+	i2cSourceClock = CLOCK_GetFreq(I2C1_CLK_SRC);
+	gfxosHandle.base = I2C1;
+	gfxosHandle.i2cHandle = &MasterHandle;
+
+	I2C_MasterGetDefaultConfig(&i2cConfig);
+	I2C_MasterInit(I2C1, &i2cConfig, i2cSourceClock);
+	I2C_MasterTransferCreateHandle(I2C1, &MasterHandle, NULL, NULL);
+
+	/* Find sensor devices */
+	array_addr_size = sizeof(accel_address) / sizeof(accel_address[0]);
+	for (acclIndex = 0; acclIndex < array_addr_size; acclIndex++)
+	{
+		gfxosHandle.xfer.slaveAddress = accel_address[acclIndex];
+		if (FXOS_ReadReg(&gfxosHandle, WHO_AM_I_REG, &regResult, 1) == kStatus_Success)
+		{
+			foundDevice = true;
+			break;
+		}
+		if ((acclIndex == (array_addr_size - 1)) && (!foundDevice))
+		{
+			PRINTF("\r\nDo not found sensor device\r\n");
+			while (1)
+			{
+			};
+		}
+	}
+	/* END of init accel and i2c */
+
+
+
+
+
     /* Initialize pointer to application task message queue */
     mpAppThreadMsgQueue = &appThreadMsgQueue;
 
@@ -1513,16 +1574,30 @@ static void APP_ProcessTimerCmd(void* pData)
 
 static void APP_CoapTimerCb (coapSessionStatus_t sessionStatus,void *pData,coapSession_t *pSession,uint32_t dataLen)
 {
+
+	int16_t xData, yData, zData;
 	uint8_t *pCounter = NULL;
 	uint32_t ackPloadSize = 0;
 	char addrStr[INET_ADDRSTRLEN];
 	ntop(AF_INET, (ipAddr_t*)&pSession->remoteAddrStorage.ss_addr, addrStr, INET_ADDRSTRLEN);
+
+
+
 
   if(gCoapGET_c == pSession->code)
   {
 	  /* Get counter value */
 	  pCounter = APP_ProcessTimerCmd();
 	  ackPloadSize = strlen((char*)pCounter);
+	  if (FXOS_ReadSensorData(&gfxosHandle, &gsensorData) != kStatus_Success)
+	 	{
+	 		return -1;
+	 	}
+
+	 	/* Get the X, Y and Z data from the sensor data structure in 14 bit left format data*/
+	 	xData = (int16_t)((uint16_t)((uint16_t)gsensorData.accelXMSB << 8) | (uint16_t)gsensorData.accelXLSB) / 4U;
+	 	yData = (int16_t)((uint16_t)((uint16_t)gsensorData.accelYMSB << 8) | (uint16_t)gsensorData.accelYLSB) / 4U;
+	 	zData = (int16_t)((uint16_t)((uint16_t)gsensorData.accelZMSB << 8) | (uint16_t)gsensorData.accelZLSB) / 4U;
   }
 
   if(gCoapConfirmable_c == pSession->msgType)
@@ -1550,7 +1625,7 @@ static void APP_CoapTimerCb (coapSessionStatus_t sessionStatus,void *pData,coapS
   if(pTempString)
   {
 	  /* Free the memory of the counter pointer */
-	  MEM_BufferFree(pTempString);
+	  MEM_BufferFree(pCounter);
   }
 }
 
