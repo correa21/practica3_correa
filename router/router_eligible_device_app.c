@@ -1627,8 +1627,8 @@ static void APP_CoapTimerCb (coapSessionStatus_t sessionStatus,void *pData,coapS
 static void APP_CoapAccelCb(coapSessionStatus_t sessionStatus,void *pData,coapSession_t *pSession,uint32_t dataLen)
 
 {
-	enum{ xData, yData, zData};
-		uint8_t pLoadSize = 3;
+	enum{ xData,SPACE1, yData,SPACE2, zData};
+		uint8_t pLoadSize = 5;
 		uint16_t AccRaw[pLoadSize];
 		//char addrStr[INET_ADDRSTRLEN];
 		//ntop(AF_INET, (ipAddr_t*)&pSession->remoteAddrStorage.ss_addr, addrStr, INET_ADDRSTRLEN);
@@ -1643,7 +1643,9 @@ static void APP_CoapAccelCb(coapSessionStatus_t sessionStatus,void *pData,coapSe
 
 		 	/* Get the X, Y and Z data from the sensor data structure in 14 bit left format data*/
 		  AccRaw[xData] = (int16_t)((uint16_t)((uint16_t)gsensorData.accelXMSB << 8) | (uint16_t)gsensorData.accelXLSB) / 4U;
+		  AccRaw[SPACE1] = 0x30;
 		  AccRaw[yData] = (int16_t)((uint16_t)((uint16_t)gsensorData.accelYMSB << 8) | (uint16_t)gsensorData.accelYLSB) / 4U;
+		  AccRaw[SPACE2] = 0x30;
 		  AccRaw[zData] = (int16_t)((uint16_t)((uint16_t)gsensorData.accelZMSB << 8) | (uint16_t)gsensorData.accelZLSB) / 4U;
 	  }
 
@@ -1657,5 +1659,11 @@ static void APP_CoapAccelCb(coapSessionStatus_t sessionStatus,void *pData,coapSe
 		  {
 			  COAP_Send(pSession, gCoapMsgTypeEmptyAck_c, NULL, 0);
 		  }
+
+		  shell_writeN(pData, dataLen);
+		  shell_write("\r\n");
+		  shell_write("SE ENVIARON ESTOS DATOS\r\n");
+		  shell_writeN( AccRaw, pLoadSize+2);
+		  shell_write("\r\n");
 }
 
