@@ -20,6 +20,7 @@ PinsProfile:
 
 #include "fsl_common.h"
 #include "fsl_port.h"
+#include "fsl_gpio.h"
 #include "pin_mux.h"
 
 /*
@@ -302,6 +303,14 @@ void BOARD_I2C_ConfigurePins(void) {
   };
   PORT_SetPinConfig(PORTC, PIN3_IDX, &portc3_pin39_config);  /* PORTC3 (pin 39) is configured as I2C1_SDA */
 }
+
+#define I2C_RELEASE_SDA_PORT 		PORTC
+#define I2C_RELEASE_SCL_PORT 		PORTC
+#define I2C_RELEASE_SDA_GPIO 		GPIOC
+#define I2C_RELEASE_SDA_PIN 		3U
+#define I2C_RELEASE_SCL_GPIO 		GPIOC
+#define I2C_RELEASE_SCL_PIN 		2U
+#define I2C_RELEASE_BUS_COUNT 100U
 
 static void i2c_release_bus_delay(void)
 {

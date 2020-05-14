@@ -245,7 +245,6 @@ void APP_Init
 		}
 		if ((acclIndex == (array_addr_size - 1)) && (!foundDevice))
 		{
-			PRINTF("\r\nDo not found sensor device\r\n");
 			while (1)
 			{
 			};
@@ -1575,9 +1574,9 @@ static void APP_ProcessTimerCmd(void* pData)
 static void APP_CoapTimerCb (coapSessionStatus_t sessionStatus,void *pData,coapSession_t *pSession,uint32_t dataLen)
 {
 
-	int16_t xData, yData, zData;
-	uint8_t *pCounter = NULL;
-	uint32_t ackPloadSize = 0;
+	enum{ xData, yData, zData};
+	uint8_t pLoadSize = 3;
+	uint16_t AccRaw[pLoadSize];
 	char addrStr[INET_ADDRSTRLEN];
 	ntop(AF_INET, (ipAddr_t*)&pSession->remoteAddrStorage.ss_addr, addrStr, INET_ADDRSTRLEN);
 
@@ -1587,25 +1586,24 @@ static void APP_CoapTimerCb (coapSessionStatus_t sessionStatus,void *pData,coapS
   if(gCoapGET_c == pSession->code)
   {
 	  /* Get counter value */
-	  pCounter = APP_ProcessTimerCmd();
-	  ackPloadSize = strlen((char*)pCounter);
 	  if (FXOS_ReadSensorData(&gfxosHandle, &gsensorData) != kStatus_Success)
 	 	{
 	 		return -1;
 	 	}
 
 	 	/* Get the X, Y and Z data from the sensor data structure in 14 bit left format data*/
-	 	xData = (int16_t)((uint16_t)((uint16_t)gsensorData.accelXMSB << 8) | (uint16_t)gsensorData.accelXLSB) / 4U;
-	 	yData = (int16_t)((uint16_t)((uint16_t)gsensorData.accelYMSB << 8) | (uint16_t)gsensorData.accelYLSB) / 4U;
-	 	zData = (int16_t)((uint16_t)((uint16_t)gsensorData.accelZMSB << 8) | (uint16_t)gsensorData.accelZLSB) / 4U;
+	  AccRaw[xData] = (int16_t)((uint16_t)((uint16_t)gsensorData.accelXMSB << 8) | (uint16_t)gsensorData.accelXLSB) / 4U;
+	  AccRaw[yData] = (int16_t)((uint16_t)((uint16_t)gsensorData.accelYMSB << 8) | (uint16_t)gsensorData.accelYLSB) / 4U;
+	  AccRaw[zData] = (int16_t)((uint16_t)((uint16_t)gsensorData.accelZMSB << 8) | (uint16_t)gsensorData.accelZLSB) / 4U;
   }
+
 
   if(gCoapConfirmable_c == pSession->msgType)
   {
 	  if(gCoapGET_c == pSession->code)
 	  {
 
-		  COAP_Send(pSession, gCoapMsgTypeAckSuccessContent_c, pCounter, ackPloadSize);
+		  COAP_Send(pSession, gCoapMsgTypeAckSuccessContent_c, AccRaw, pLoadSize);
 	  }
 	  else
 	  {
@@ -1622,11 +1620,6 @@ static void APP_CoapTimerCb (coapSessionStatus_t sessionStatus,void *pData,coapS
 	  shell_write("\r\n");
   }
 
-  if(pTempString)
-  {
-	  /* Free the memory of the counter pointer */
-	  MEM_BufferFree(pCounter);
-  }
 }
 
 
@@ -1634,11 +1627,35 @@ static void APP_CoapTimerCb (coapSessionStatus_t sessionStatus,void *pData,coapS
 static void APP_CoapAccelCb(coapSessionStatus_t sessionStatus,void *pData,coapSession_t *pSession,uint32_t dataLen)
 
 {
-  if (gCoapNonConfirmable_c == pSession->msgType)
-  {
-      shell_write("'NON' packet received 'POST' with payload: ");
-      shell_writeN(pData, dataLen);
-      shell_write("\r\n");
-  }
+	enum{ xData, yData, zData};
+		uint8_t pLoadSize = 3;
+		uint16_t AccRaw[pLoadSize];
+		//char addrStr[INET_ADDRSTRLEN];
+		//ntop(AF_INET, (ipAddr_t*)&pSession->remoteAddrStorage.ss_addr, addrStr, INET_ADDRSTRLEN);
+
+	  if(gCoapGET_c == pSession->code)
+	  {
+		  /* Get counter value */
+		  if (FXOS_ReadSensorData(&gfxosHandle, &gsensorData) != kStatus_Success)
+		 	{
+		 		return -1;
+		 	}
+
+		 	/* Get the X, Y and Z data from the sensor data structure in 14 bit left format data*/
+		  AccRaw[xData] = (int16_t)((uint16_t)((uint16_t)gsensorData.accelXMSB << 8) | (uint16_t)gsensorData.accelXLSB) / 4U;
+		  AccRaw[yData] = (int16_t)((uint16_t)((uint16_t)gsensorData.accelYMSB << 8) | (uint16_t)gsensorData.accelYLSB) / 4U;
+		  AccRaw[zData] = (int16_t)((uint16_t)((uint16_t)gsensorData.accelZMSB << 8) | (uint16_t)gsensorData.accelZLSB) / 4U;
+	  }
+
+
+		  if(gCoapGET_c == pSession->code)
+		  {
+
+			  COAP_Send(pSession, gCoapMsgTypeAckSuccessContent_c, AccRaw, pLoadSize);
+		  }
+		  else
+		  {
+			  COAP_Send(pSession, gCoapMsgTypeEmptyAck_c, NULL, 0);
+		  }
 }
 
