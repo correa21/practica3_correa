@@ -54,6 +54,8 @@ Include Files
 #include "app_echo_udp.h"
 #endif
 
+
+
 /*==================================================================================================
 Private macros
 ==================================================================================================*/
@@ -83,8 +85,6 @@ Private macros
 #define APP_RESET_TO_FACTORY_URI_PATH           "/reset"
 #endif
 
-#define APP_TIMER_URI_PATH						"/timer"
-#define APP_ACCEL_URI_PATH						"/accel"
 
 #define APP_DEFAULT_DEST_ADDR                   in6addr_realmlocal_allthreadnodes
 
@@ -134,13 +134,6 @@ static void APP_AutoStartCb(void *param);
 #endif
 
 
-
-static void APP_CoapTimerCb(coapSessionStatus_t sessionStatus, void *pData, coapSession_t *pSession, uint32_t dataLen);
-static void APP_CoapAccelCb(coapSessionStatus_t sessionStatus, void *pData, coapSession_t *pSession, uint32_t dataLen);
-
-
-
-
 /*==================================================================================================
 Public global variables declarations
 ==================================================================================================*/
@@ -150,10 +143,6 @@ const coapUriPath_t gAPP_SINK_URI_PATH = {SizeOfString(APP_SINK_URI_PATH), (uint
 #if LARGE_NETWORK
 const coapUriPath_t gAPP_RESET_URI_PATH = {SizeOfString(APP_RESET_TO_FACTORY_URI_PATH), (uint8_t *)APP_RESET_TO_FACTORY_URI_PATH};
 #endif
-
-
-const coapUriPath_t gAPP_TIMER_URI_PATH = {SizeOfString(APP_TIMER_URI_PATH), APP_TIMER_URI_PATH};
-const coapUriPath_t gAPP_ACCEL_URI_PATH = {SizeOfString(APP_ACCEL_URI_PATH), APP_ACCEL_URI_PATH};
 
 
 /* Application state/mode */
@@ -184,6 +173,9 @@ taskMsgQueue_t *mpAppThreadMsgQueue = NULL;
 
 extern bool_t gEnable802154TxLed;
 
+
+
+
 /*==================================================================================================
 Public functions
 ==================================================================================================*/
@@ -196,6 +188,7 @@ void APP_Init
     void
 )
 {
+
     /* Initialize pointer to application task message queue */
     mpAppThreadMsgQueue = &appThreadMsgQueue;
 
@@ -503,10 +496,6 @@ static void APP_InitCoapDemo
 {
     coapRegCbParams_t cbParams[] =  {{APP_CoapLedCb,  (coapUriPath_t *)&gAPP_LED_URI_PATH},
                                      {APP_CoapTempCb, (coapUriPath_t *)&gAPP_TEMP_URI_PATH},
-
-									 {APP_CoapTimerCb, (coapUriPath_t*)&gAPP_TIMER_URI_PATH},
-
-									 {APP_CoapAccelCb, (coapUriPath_t*)&gAPP_ACCEL_URI_PATH},
 
 #if LARGE_NETWORK
                                      {APP_CoapResetToFactoryDefaultsCb, (coapUriPath_t *)&gAPP_RESET_URI_PATH},
@@ -1503,67 +1492,4 @@ static void APP_AutoStartCb
 Private debug functions
 ==================================================================================================*/
 
-
-static void APP_ProcessTimerCmd(void* pData)
-{
-
-}
-
-
-
-static void APP_CoapTimerCb (coapSessionStatus_t sessionStatus,void *pData,coapSession_t *pSession,uint32_t dataLen)
-{
-	uint8_t *pCounter = NULL;
-	uint32_t ackPloadSize = 0;
-	char addrStr[INET_ADDRSTRLEN];
-	ntop(AF_INET, (ipAddr_t*)&pSession->remoteAddrStorage.ss_addr, addrStr, INET_ADDRSTRLEN);
-
-  if(gCoapGET_c == pSession->code)
-  {
-	  /* Get counter value */
-	  pCounter = APP_ProcessTimerCmd();
-	  ackPloadSize = strlen((char*)pCounter);
-  }
-
-  if(gCoapConfirmable_c == pSession->msgType)
-  {
-	  if(gCoapGET_c == pSession->code)
-	  {
-
-		  COAP_Send(pSession, gCoapMsgTypeAckSuccessContent_c, pCounter, ackPloadSize);
-	  }
-	  else
-	  {
-		  COAP_Send(pSession, gCoapMsgTypeAckSuccessChanged_c, NULL, 0);
-	  }
-	  shell_write("'CON' packet received from  ");
-	  shell_writeN((char*) addrStr, INET_ADDRSTRLEN);
-	  shell_write("\r\n");
-  }
-  else
-  {
-	  shell_write("'NON' packet received from  ");
-	  shell_writeN((char*) addrStr, INET_ADDRSTRLEN);
-	  shell_write("\r\n");
-  }
-
-  if(pTempString)
-  {
-	  /* Free the memory of the counter pointer */
-	  MEM_BufferFree(pTempString);
-  }
-}
-
-
-
-static void APP_CoapAccelCb(coapSessionStatus_t sessionStatus,void *pData,coapSession_t *pSession,uint32_t dataLen)
-
-{
-  if (gCoapNonConfirmable_c == pSession->msgType)
-  {
-      shell_write("'NON' packet received 'POST' with payload: ");
-      shell_writeN(pData, dataLen);
-      shell_write("\r\n");
-  }
-}
 
