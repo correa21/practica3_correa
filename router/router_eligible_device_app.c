@@ -57,6 +57,8 @@ Include Files
 /* Accelerometer files */
 #include "fsl_fxos.h"
 #include "stdbool.h"
+#include "pin_mux.h"
+#include "clock_config.h"
 
 
 /*==================================================================================================
@@ -88,7 +90,7 @@ Private macros
 #define APP_RESET_TO_FACTORY_URI_PATH           "/reset"
 #endif
 
-#define APP_TIMER_URI_PATH						"/timer"
+
 #define APP_ACCEL_URI_PATH						"/accel"
 
 #define APP_DEFAULT_DEST_ADDR                   in6addr_realmlocal_allthreadnodes
@@ -146,7 +148,6 @@ static void APP_AutoStartCb(void *param);
 
 
 
-static void APP_CoapTimerCb(coapSessionStatus_t sessionStatus, void *pData, coapSession_t *pSession, uint32_t dataLen);
 static void APP_CoapAccelCb(coapSessionStatus_t sessionStatus, void *pData, coapSession_t *pSession, uint32_t dataLen);
 
 
@@ -162,9 +163,7 @@ const coapUriPath_t gAPP_SINK_URI_PATH = {SizeOfString(APP_SINK_URI_PATH), (uint
 const coapUriPath_t gAPP_RESET_URI_PATH = {SizeOfString(APP_RESET_TO_FACTORY_URI_PATH), (uint8_t *)APP_RESET_TO_FACTORY_URI_PATH};
 #endif
 
-
-const coapUriPath_t gAPP_TIMER_URI_PATH = {SizeOfString(APP_TIMER_URI_PATH), APP_TIMER_URI_PATH};
-const coapUriPath_t gAPP_ACCEL_URI_PATH = {SizeOfString(APP_ACCEL_URI_PATH), APP_ACCEL_URI_PATH};
+const coapUriPath_t gAPP_ACCEL_URI_PATH = {SizeOfString(APP_ACCEL_URI_PATH), (uint8_t *)APP_ACCEL_URI_PATH};
 
 
 /* Application state/mode */
@@ -259,9 +258,9 @@ void APP_Init
 		}
 	}
 	 /* Init accelerometer sensor */
-	    if (FXOS_Init(&gfxosHandle) != kStatus_Success)
+	    while (FXOS_Init(&gfxosHandle) != kStatus_Success)
 	    {
-	        return -1;
+
 	    }
 	/* END of init accel and i2c */
 
@@ -577,7 +576,6 @@ static void APP_InitCoapDemo
     coapRegCbParams_t cbParams[] =  {{APP_CoapLedCb,  (coapUriPath_t *)&gAPP_LED_URI_PATH},
                                      {APP_CoapTempCb, (coapUriPath_t *)&gAPP_TEMP_URI_PATH},
 
-									 {APP_CoapTimerCb, (coapUriPath_t*)&gAPP_TIMER_URI_PATH},
 
 									 {APP_CoapAccelCb, (coapUriPath_t*)&gAPP_ACCEL_URI_PATH},
 
@@ -1577,12 +1575,6 @@ Private debug functions
 ==================================================================================================*/
 
 
-static void APP_CoapTimerCb (coapSessionStatus_t sessionStatus,void *pData,coapSession_t *pSession,uint32_t dataLen)
-{
-/* Empty for future timer coap  */
-
-}
-
 void *App_GetAccelDataString
 (
     void
@@ -1642,30 +1634,25 @@ void *App_GetAccelDataString
 static void APP_CoapAccelCb(coapSessionStatus_t sessionStatus,void *pData,coapSession_t *pSession,uint32_t dataLen)
 
 {
-		uint8_t *pAckMsg;
-		uint32_t loadSize;
-		//char addrStr[INET_ADDRSTRLEN];
-		//ntop(AF_INET, (ipAddr_t*)&pSession->remoteAddrStorage.ss_addr, addrStr, INET_ADDRSTRLEN);
+	uint8_t *pAckMsg = NULL;
+	uint32_t loadSize = 0;
+	//char addrStr[INET_ADDRSTRLEN];
+	//ntop(AF_INET, (ipAddr_t*)&pSession->remoteAddrStorage.ss_addr, addrStr, INET_ADDRSTRLEN);
 
-	  if(gCoapGET_c == pSession->code)
-	  {
-		  pAckMsg = App_GetAccelDataString();
-		  loadSize = strlen((char*)pAckMsg);
-	  }
+	if(gCoapGET_c == pSession->code)
+	{
+		pAckMsg = App_GetAccelDataString();
+		loadSize = strlen((char*)pAckMsg);
+		COAP_Send(pSession, gCoapMsgTypeAckSuccessContent_c, pAckMsg, loadSize);
+	}
+	else
+	{
+		COAP_Send(pSession, gCoapMsgTypeEmptyAck_c, NULL, 0);
+	}
 
-
-	  if(gCoapGET_c == pSession->code)
-	  {
-		  COAP_Send(pSession, gCoapMsgTypeAckSuccessContent_c, pAckMsg, loadSize);
-	  }
-	  else
-	  {
-		  COAP_Send(pSession, gCoapMsgTypeEmptyAck_c, NULL, 0);
-	  }
-
-	  if(pAckMsg)
-	 {
-		 MEM_BufferFree(pAckMsg);
-	 }
+	if(pAckMsg)
+	{
+		MEM_BufferFree(pAckMsg);
+	}
 }
 
