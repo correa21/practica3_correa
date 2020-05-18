@@ -99,7 +99,7 @@ Private macros
 /* Enums for accelerometer data organization */
 enum{ xData, yData, zData};
 
-#define ACCEL_BUFFER_SIZE						(24U)
+#define ACCEL_BUFFER_SIZE						(25U)
 
 /*==================================================================================================
 Private type definitions
@@ -1580,7 +1580,7 @@ void *App_GetAccelDataString
     void
 )
 {
-	uint8_t dataElements = 3;
+	uint8_t dataElements = 2;
 	uint16_t AccRaw[dataElements];
 
 	/* Compute temperature */
